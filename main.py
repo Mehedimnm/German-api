@@ -4,7 +4,7 @@ import requests
 import json
 from bs4 import BeautifulSoup
 from flask import Flask, request, Response
-from deep_translator import GoogleTranslator # নতুন লাইব্রেরি ইম্পোর্ট করা হয়েছে
+import translators as ts # নতুন লাইব্রেরি ইম্পোর্ট করা হয়েছে
 
 app = Flask(__name__)
 app.config['JSON_SORT_KEYS'] = False
@@ -66,7 +66,7 @@ def get_declension_api():
         return Response(error_json, status=404, mimetype='application/json')
 
 
-# --- deep-translator লাইব্রেরি দিয়ে এই ফাংশনটি নতুন করে লেখা হয়েছে ---
+# --- 'translators' লাইব্রেরি দিয়ে এই ফাংশনটি নতুন করে লেখা হয়েছে ---
 @app.route('/translate', methods=['GET'])
 def translate_and_get_declension():
     bengali_word = request.args.get('bengali_word')
@@ -75,8 +75,8 @@ def translate_and_get_declension():
         return Response(error_json, status=400, mimetype='application/json')
 
     try:
-        # নতুন লাইব্রেরি ব্যবহার করে অনুবাদ করা হচ্ছে
-        german_word = GoogleTranslator(source='bn', target='de').translate(bengali_word)
+        # translators লাইব্রেরি ব্যবহার করে অনুবাদ করা হচ্ছে
+        german_word = ts.translate_text(bengali_word, translator='google', from_language='bn', to_language='de')
 
         if not german_word:
             error_json = json.dumps({'error': 'Could not get German translation.'})
@@ -101,3 +101,4 @@ def translate_and_get_declension():
     except Exception as e:
         error_json = json.dumps({'error': 'An unexpected error occurred during translation.', 'details': str(e)})
         return Response(error_json, status=500, mimetype='application/json')
+

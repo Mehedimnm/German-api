@@ -4,6 +4,7 @@ import requests
 import json
 from bs4 import BeautifulSoup
 from flask import Flask, request, Response
+from deep_translator import GoogleTranslator # নতুন লাইব্রেরি ইম্পোর্ট করা হয়েছে
 
 app = Flask(__name__)
 app.config['JSON_SORT_KEYS'] = False
@@ -64,7 +65,8 @@ def get_declension_api():
         error_json = json.dumps({'error': f"The word '{user_word}' could not be found."})
         return Response(error_json, status=404, mimetype='application/json')
 
-# --- নতুন Google Translate API অনুযায়ী এই ফাংশনটি আপডেট করা হয়েছে ---
+
+# --- deep-translator লাইব্রেরি দিয়ে এই ফাংশনটি নতুন করে লেখা হয়েছে ---
 @app.route('/translate', methods=['GET'])
 def translate_and_get_declension():
     bengali_word = request.args.get('bengali_word')
@@ -73,28 +75,8 @@ def translate_and_get_declension():
         return Response(error_json, status=400, mimetype='application/json')
 
     try:
-        # Google Translate API-এর জন্য প্রয়োজনীয় হেডার
-        headers = {
-            'User-Agent': 'AndroidTranslate/2.5.3 2.5.3 (gzip)',
-        }
-        # API-এর URL এবং প্যারামিটার
-        params = {
-            'client': 'gtx',
-            'sl': 'bn',
-            'tl': 'de',
-            'dt': 't',
-            'dj': '1',
-            'q': bengali_word,
-        }
-        
-        translation_api_url = "https://translate.googleapis.com/translate_a/single"
-        
-        translation_response_raw = requests.get(translation_api_url, params=params, headers=headers, timeout=10)
-        translation_response_raw.raise_for_status()
-        translation_response = translation_response_raw.json()
-
-        # Google Translate-এর JSON গঠন অনুযায়ী জার্মান শব্দটি বের করা হচ্ছে
-        german_word = translation_response['sentences'][0]['trans']
+        # নতুন লাইব্রেরি ব্যবহার করে অনুবাদ করা হচ্ছে
+        german_word = GoogleTranslator(source='bn', target='de').translate(bengali_word)
 
         if not german_word:
             error_json = json.dumps({'error': 'Could not get German translation.'})
@@ -117,5 +99,5 @@ def translate_and_get_declension():
             return Response(error_json, status=404, mimetype='application/json')
 
     except Exception as e:
-        error_json = json.dumps({'error': 'An unexpected error occurred.', 'details': str(e)})
+        error_json = json.dumps({'error': 'An unexpected error occurred during translation.', 'details': str(e)})
         return Response(error_json, status=500, mimetype='application/json')

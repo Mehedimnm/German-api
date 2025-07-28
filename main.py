@@ -2,9 +2,11 @@
 
 import requests
 from bs4 import BeautifulSoup
-from flask import Flask, request, jsonify
+from flask import Flask, request, Response # jsonify এর বদলে Response ইম্পোর্ট করা হয়েছে
+import json # json লাইব্রেরি ইম্পোর্ট করা হয়েছে
 
 app = Flask(__name__)
+# Flask-কে কী (key) সর্ট না করার জন্য এই লাইনটি থাকবে
 app.config['JSON_SORT_KEYS'] = False
 
 def find_word_data(word):
@@ -33,6 +35,7 @@ def scrape_declension_table(html_content):
                 case = cells[0].get_text(strip=True)
                 singular = " ".join(cells[1].stripped_strings)
                 plural = " ".join(cells[2].stripped_strings)
+                # ডিকশনারির ক্রম এখানে ঠিক করা আছে
                 row_data = {
                     "singular": singular,
                     "plural": plural,
@@ -40,32 +43,38 @@ def scrape_declension_table(html_content):
                 }
                 declension_data.append(row_data)
     except Exception: return None
-    
-    # যদি টেবিল পাওয়া যায় কিন্তু কোনো ডেটা না থাকে, তাহলে খালি লিস্ট রিটার্ন করবে
     return declension_data
 
-# --- এই ফাংশনটি সম্পূর্ণ ঠিক করা হয়েছে ---
 @app.route('/', methods=['GET'])
 def get_declension_api():
     user_word = request.args.get('word')
     if not user_word:
-        return jsonify({'error': 'Please provide a word. Example: /?word=Auto'}), 400
+        # এখানেও ম্যানুয়াল রেসপন্স ব্যবহার করা হলো
+        error_json = json.dumps({'error': 'Please provide a word. Example: /?word=Auto'})
+        return Response(error_json, status=400, mimetype='application/json')
 
     found_article, html_page = find_word_data(user_word)
     if html_page:
         table_data = scrape_declension_table(html_page)
-
-        # table_data তে কিছু থাকলে (খালি লিস্ট না হলে) এই কোড চলবে
         if table_data:
             main_singular_form = table_data[0].get("singular", "")
-            final_response = {
+            
+            # --- এই অংশে মূল পরিবর্তন আনা হয়েছে ---
+            # ম্যানুয়ালি ডিকশনারির ক্রম তৈরি করা
+            final_response_dict = {
                 "main_singular": main_singular_form,
                 "declensions": table_data
             }
-            return jsonify(final_response)
-        # যদি table_data তে কিছু না থাকে (None বা খালি লিস্ট)
+            # ডিকশনারিকে JSON স্ট্রিং-এ পরিণত করা (indent=2 দিয়ে সুন্দরভাবে সাজানো হলো)
+            json_string = json.dumps(final_response_dict, indent=2, ensure_ascii=False)
+            # ম্যানুয়ালি একটি Response অবজেক্ট তৈরি করে রিটার্ন করা
+            return Response(json_string, mimetype='application/json')
+            # --- পরিবর্তন শেষ ---
+
         else:
-            return jsonify({'error': f"A data table could not be found for the word: '{user_word}'"}), 404
-    # যদি html_page খুঁজে না পাওয়া যায়
+            error_json = json.dumps({'error': f"A data table could not be found for the word: '{user_word}'"})
+            return Response(error_json, status=404, mimetype='application/json')
     else:
-        return jsonify({'error': f"The word '{user_word}' could not be found."}), 404
+        error_json = json.dumps({'error': f"The word '{user_word}' could not be found."})
+        return Response(error_json, status=404, mimetype='application/json')
+

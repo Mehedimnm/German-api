@@ -1,15 +1,20 @@
 # main.py
 
 import requests
+import json
 from bs4 import BeautifulSoup
-from flask import Flask, request, Response # jsonify এর বদলে Response ইম্পোর্ট করা হয়েছে
-import json # json লাইব্রেরি ইম্পোর্ট করা হয়েছে
+from flask import Flask, request, Response
 
+# Flask অ্যাপ অবজেক্ট তৈরি করা
 app = Flask(__name__)
-# Flask-কে কী (key) সর্ট না করার জন্য এই লাইনটি থাকবে
+# JSON কী-গুলোকে (keys) বর্ণানুক্রমে সাজানো বন্ধ করা হয়েছে
 app.config['JSON_SORT_KEYS'] = False
 
+
 def find_word_data(word):
+    """
+    এই ফাংশনটি একটি জার্মান শব্দের জন্য সঠিক আর্টিকেল ও পেজের HTML কন্টেন্ট খুঁজে বের করে।
+    """
     formatted_word = word.strip().capitalize()
     articles = ['der', 'die', 'das']
     for article in articles:
@@ -17,16 +22,23 @@ def find_word_data(word):
         try:
             response = requests.get(url, timeout=10)
             if response.status_code == 200:
+                # উমলাউট সমস্যার সমাধানের জন্য এনকোডিং স্পষ্টভাবে সেট করা হয়েছে
+                response.encoding = 'utf-8'
                 return article, response.text
         except requests.exceptions.RequestException:
             continue
     return None, None
 
+
 def scrape_declension_table(html_content):
+    """
+    এই ফাংশনটি HTML কন্টেন্ট থেকে ডিক্লেনশন টেবিল স্ক্র্যাপ করে।
+    """
     soup = BeautifulSoup(html_content, 'html.parser')
     declension_data = []
     table = soup.find('table', class_='table')
-    if not table: return None
+    if not table:
+        return None
     try:
         rows = table.find('tbody').find_all('tr')
         for row in rows:
@@ -35,21 +47,25 @@ def scrape_declension_table(html_content):
                 case = cells[0].get_text(strip=True)
                 singular = " ".join(cells[1].stripped_strings)
                 plural = " ".join(cells[2].stripped_strings)
-                # ডিকশনারির ক্রম এখানে ঠিক করা আছে
+                # আপনার অনুরোধ অনুযায়ী ডিকশনারির ক্রম ঠিক করা হয়েছে
                 row_data = {
                     "singular": singular,
                     "plural": plural,
                     "case": case
                 }
                 declension_data.append(row_data)
-    except Exception: return None
+    except Exception:
+        return None
     return declension_data
+
 
 @app.route('/', methods=['GET'])
 def get_declension_api():
+    """
+    এই ফাংশনটি API রিকোয়েস্ট হ্যান্ডেল করে এবং চূড়ান্ত ফলাফল পাঠায়।
+    """
     user_word = request.args.get('word')
     if not user_word:
-        # এখানেও ম্যানুয়াল রেসপন্স ব্যবহার করা হলো
         error_json = json.dumps({'error': 'Please provide a word. Example: /?word=Auto'})
         return Response(error_json, status=400, mimetype='application/json')
 
@@ -59,18 +75,14 @@ def get_declension_api():
         if table_data:
             main_singular_form = table_data[0].get("singular", "")
             
-            # --- এই অংশে মূল পরিবর্তন আনা হয়েছে ---
-            # ম্যানুয়ালি ডিকশনারির ক্রম তৈরি করা
+            # আপনার অনুরোধ অনুযায়ী চূড়ান্ত JSON অবজেক্ট তৈরি করা
             final_response_dict = {
                 "main_singular": main_singular_form,
                 "declensions": table_data
             }
-            # ডিকশনারিকে JSON স্ট্রিং-এ পরিণত করা (indent=2 দিয়ে সুন্দরভাবে সাজানো হলো)
+            # JSON স্ট্রিং তৈরি এবং Response হিসেবে পাঠানো
             json_string = json.dumps(final_response_dict, indent=2, ensure_ascii=False)
-            # ম্যানুয়ালি একটি Response অবজেক্ট তৈরি করে রিটার্ন করা
             return Response(json_string, mimetype='application/json')
-            # --- পরিবর্তন শেষ ---
-
         else:
             error_json = json.dumps({'error': f"A data table could not be found for the word: '{user_word}'"})
             return Response(error_json, status=404, mimetype='application/json')

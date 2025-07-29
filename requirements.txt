@@ -1,5 +1,6 @@
-flask
+Flask
 requests
 beautifulsoup4
-gunicorn
 translators
+Flask-Cors
+gunicorn

@@ -1,16 +1,20 @@
-# main.py
+# main.py (সংশোধিত কোড)
 
 import requests
 import json
 from bs4 import BeautifulSoup
 from flask import Flask, request, Response
-import translators as ts # নতুন লাইব্রেরি ইম্পোর্ট করা হয়েছে
+from flask_cors import CORS  # ১. এই লাইনটি যোগ করুন
+import translators as ts
 
 app = Flask(__name__)
 app.config['JSON_SORT_KEYS'] = False
+CORS(app)  # ২. এই লাইনটি যোগ করুন। এটি আপনার API-তে CORS চালু করবে।
 
-# --- আগের ফাংশনগুলো অপরিবর্তিত থাকবে ---
+# --- আপনার বাকি কোড অপরিবর্তিত থাকবে ---
+
 def find_word_data(word):
+    # ... (কোনো পরিবর্তন নেই) ...
     formatted_word = word.strip().capitalize()
     articles = ['der', 'die', 'das']
     for article in articles:
@@ -25,6 +29,7 @@ def find_word_data(word):
     return None, None
 
 def scrape_declension_table(html_content):
+    # ... (কোনো পরিবর্তন নেই) ...
     soup = BeautifulSoup(html_content, 'html.parser')
     declension_data = []
     table = soup.find('table', class_='table')
@@ -42,9 +47,9 @@ def scrape_declension_table(html_content):
     except Exception: return None
     return declension_data
 
-# --- আগের '/ ' রুটটি অপরিবর্তিত থাকবে ---
 @app.route('/', methods=['GET'])
 def get_declension_api():
+    # ... (কোনো পরিবর্তন নেই) ...
     user_word = request.args.get('word')
     if not user_word:
         error_json = json.dumps({'error': 'Please provide a word. Example: /?word=Auto'})
@@ -65,24 +70,20 @@ def get_declension_api():
         error_json = json.dumps({'error': f"The word '{user_word}' could not be found."})
         return Response(error_json, status=404, mimetype='application/json')
 
-
-# --- 'translators' লাইব্রেরি দিয়ে এই ফাংশনটি নতুন করে লেখা হয়েছে ---
 @app.route('/translate', methods=['GET'])
 def translate_and_get_declension():
+    # ... (কোনো পরিবর্তন নেই) ...
     bengali_word = request.args.get('bengali_word')
     if not bengali_word:
         error_json = json.dumps({'error': 'Please provide a Bengali word. Example: /translate?bengali_word=আপেল'})
         return Response(error_json, status=400, mimetype='application/json')
 
     try:
-        # translators লাইব্রেরি ব্যবহার করে অনুবাদ করা হচ্ছে
         german_word = ts.translate_text(bengali_word, translator='google', from_language='bn', to_language='de')
-
         if not german_word:
             error_json = json.dumps({'error': 'Could not get German translation.'})
             return Response(error_json, status=500, mimetype='application/json')
 
-        # অনুবাদ করা জার্মান শব্দটি দিয়ে মূল লজিকটি আবার চালানো হচ্ছে
         found_article, html_page = find_word_data(german_word)
         if html_page:
             table_data = scrape_declension_table(html_page)
@@ -101,4 +102,3 @@ def translate_and_get_declension():
     except Exception as e:
         error_json = json.dumps({'error': 'An unexpected error occurred during translation.', 'details': str(e)})
         return Response(error_json, status=500, mimetype='application/json')
-
